@@ -1,1 +1,10 @@
+MA Plot:
+Differential expression analysis was performed for:
+   •	SC/B vs BM 
+   •	SC/B vs LN 
+   •	SC/B vs SP 
+An MA plot shows the relationship between gene expression level and fold change. The three comparisons showed similar patterns.
+
+Biological Interpretation:
+The similar patterns across the three comparisons indicate that SC/B has a different gene expression profile from those of the three peripheral tissues. 
 
