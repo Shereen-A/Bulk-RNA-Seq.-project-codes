@@ -1,0 +1,1019 @@
+---
+title: "Bulk RNA Seq. Final codes"
+author: "Shereen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+
+
+```{r}
+
+########################################################
+# 1. Library:
+########################################################
+
+
+#BiocManager::install("tximport")
+#BiocManager::install("biomaRt")
+#BiocManager::install("GEOquery")
+#BiocManager::install("ashr")
+#BiocManager::install("EnhancedVolcano")
+#BiocManager::install("rstatix")
+#BiocManager::install("ggpubr")
+#BiocManager::install("rlang")
+#install.packages("rlang")
+
+
+library("edgeR")
+library("dplyr")
+library("AnnotationDbi")
+library("org.Mm.eg.db")
+library(tximport)
+library(readr)
+library(pathview)
+library(gage)
+library(gageData)
+library(tibble)
+library(ggplot2)
+library(clusterProfiler)
+library(enrichplot)
+library(pheatmap)
+library(imager)
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+library(biomaRt)
+library(DESeq2)
+library(GEOquery)
+library(ashr)
+library(EnhancedVolcano)
+library(apeglm)
+library(ggrepel)
+library(tidyr)
+library(rstatix)
+library(ggpubr)
+library(reshape2)
+
+
+
+data(kegg.sets.mm)
+data(go.subs.mm)
+
+```
+
+
+
+```{r}
+
+########################################################
+# 2. Save direction for Figures:
+########################################################
+
+base.dir <- "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937"
+
+
+fig.dir <- file.path(base.dir, "Figures")
+
+dir.create(fig.dir, recursive = TRUE, showWarnings = FALSE)
+
+```
+
+
+
+
+
+```{r}
+
+
+# FASTQ data:
+
+# For GSE233937:
+# SRR24797852-63:
+#####################
+
+########################################################
+# 3. Gene Mapping:
+########################################################
+
+
+mart <- useEnsembl( biomart = "genes", dataset = "mmusculus_gene_ensembl")
+
+tx2gene <- getBM(attributes = c("ensembl_transcript_id", "ensembl_gene_id"),
+                       mart = mart)
+
+
+
+
+colnames(tx2gene) <- c("TRANSNAME", "GENEID")
+
+head (tx2gene)
+
+```
+
+
+
+
+```{r}
+
+########################################################
+# 4. Import Salmon quantifications
+########################################################
+
+files <- c(
+  SRR24797852 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797852/salmon_output_52_trim/quant_52_trim.sf",
+  SRR24797853 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797853/salmon_output_53_trim/quant_53_trim.sf",
+  SRR24797854 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797854/salmon_output_54_trim/quant_54_trim.sf",
+  SRR24797855 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797855/salmon_output_55_trim/quant_55_trim.sf",
+  SRR24797856 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797856/salmon_output_56_trim/quant_56_trim.sf",
+  SRR24797857 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797857/salmon_output_57_trim/quant_57_trim.sf",
+  SRR24797858 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797858/salmon_output_58_trim/quant_58_trim.sf",
+  SRR24797859 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797859/salmon_output_59_trim/quant_59_trim.sf",
+  SRR24797860 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797860/salmon_output_60_trim/quant_60_trim.sf",
+  SRR24797861 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797861/salmon_output_61_trim/quant_61_trim.sf",
+  SRR24797862 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797862/salmon_output_62_trim/quant_62_trim.sf",
+  SRR24797863 = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/SRR24797863/salmon_output_63_trim/quant_63_trim.sf")
+
+
+
+
+########################################################
+# 5. Check files exist
+########################################################
+
+file.exists(files)
+
+all(file.exists(files)) #---> You should get (TRUE)
+
+
+########################################################
+# 6. Import Data by: tximport
+########################################################
+
+txi <- tximport(files, type = "salmon",
+                       tx2gene = tx2gene,
+                       txOut = FALSE,
+                       ignoreTxVersion = TRUE)
+
+
+
+counts <- txi$counts
+
+head(counts)
+
+dim(counts)
+# Expected structure: Genes × Samples ---> For example: 35741 genes    12 samples
+
+summary(counts)
+
+colnames(counts)
+# You will see SRR24797852, SRR24797853, ... , SRR24797863
+
+colSums(counts)
+# total counts per sample.
+
+colSums(counts > 0)
+# number of detected genes
+
+
+gene_counts <- as.data.frame(counts)
+#this for me to see how the table look like in R
+
+
+
+########################################################
+# 7. Save raw counts 
+########################################################
+
+write.csv( counts, file = "C:/Users/shere/Desktop/R/PhD Portfolio Data/GSE233937/Tables/GSE233937_gene_counts.csv")
+
+
+```
+
+
+
+```{r}
+
+########################################################
+# 8. Sample metadata/ Create DESeq dataset
+########################################################
+
+sampleTable <- data.frame(row.names = colnames(txi$counts),
+                             tissue = factor(c(
+                                         "Spleen",
+                                         "Spleen",
+                                         "Spleen",
+    
+                                         "Lymph_nodes",
+                                         "Lymph_nodes",
+                                         "Lymph_nodes",
+    
+                                         "Spinal_cord_brain",
+                                         "Spinal_cord_brain",
+                                         "Spinal_cord_brain",
+    
+                                         "Bone_marrow",
+                                         "Bone_marrow",
+                                         "Bone_marrow")))
+
+
+sampleTable$tissue <- factor(sampleTable$tissue)
+
+
+dds <- DESeqDataSetFromTximport(txi,
+                                colData = sampleTable,
+                                design = ~ tissue)
+
+
+```
+
+
+
+
+```{r}
+
+########################################################
+# 9. QC for the Data (BEFORE filtering/Normalization/..)
+########################################################
+
+#Library size check
+
+colSums(counts(dds))
+
+barplot(colSums(counts(dds)), las = 2) 
+
+
+
+# Missing / zero inflation check
+
+summary(rowSums(counts(dds) == 0))  #--> IMPORTANT for QC: Mean=6.898 = gene is OFF=0 --> in ~7 samples & ON in 5 samples. total samples=12
+
+
+
+
+# Filter very low-expression genes
+
+keep <- rowSums(counts(dds) >= 10) >= 3  #--> gene must have ≥10 reads in at least 3 samples
+
+dds <- dds[keep, ]
+
+
+########################################################
+# 10. Run DESeq2 (normalization + dispersion + model)
+########################################################
+
+dds <- DESeq(dds)
+
+########################################################
+# 11. Size factors (NORMALIZATION CHECK **ONLY**)
+########################################################
+
+normalizationFactors(dds) 
+
+summary(normalizationFactors(dds))
+
+summary(as.vector(normalizationFactors(dds)))
+
+
+
+
+########################################################
+#  "Do my biological replicates cluster together?"
+#  "Is there any different sample?"
+########################################################
+# 12. First Visualization: Sample vs Sample
+########################################################
+
+# A. Dispersion plot 
+#####################
+
+pdf( file.path(fig.dir, "Dispersion_Plot.pdf"), width = 14, height = 8)
+
+plotDispEsts(dds) # ONLY works on: DESeqDataSet objects (dds)
+
+dev.off()
+
+
+
+# B. PCA plot 
+##############
+
+pdf( file.path(fig.dir, "PCA_Plot.pdf"), width = 14, height = 8)
+
+# PCA plot before results():
+
+# If I look at all ~35,000 genes simultaneously, which samples have similar overall expression patterns?
+
+vst_dds <- vst(dds) # For: PCA, heatmaps, clustering. 
+                    # without vst: low counts → very noisy
+                                 # high counts → much higher variance
+
+plotPCA(vst_dds, intgroup = "tissue")
+
+dev.off()
+
+
+
+# C. Heatmap
+#############
+
+sampleDists <- dist(t(assay(vst_dds))) # calculates the Euclidean distance
+
+sampleDistMatrix <- as.matrix(sampleDists)
+
+labels <- c( "SP-1",
+             "SP-2",
+             "SP-3",
+
+             "LN-1",
+             "LN-2",
+             "LN-3",
+
+             "SC/B-1",
+             "SC/B-2",
+             "SC/B-3",
+
+             "BM-1",
+             "BM-2",
+             "BM-3")
+
+
+rownames(sampleDistMatrix) <- labels
+colnames(sampleDistMatrix) <- labels
+
+
+pdf( file.path(fig.dir, "Heatmap_Sampels_Plot.pdf"), width = 14, height = 6)
+
+pheatmap(sampleDistMatrix)
+
+dev.off()
+
+
+```
+
+
+
+
+```{r}
+
+########################################################
+# In every sample: UP/Down regulated genes
+# Gene by gene testing, not the whole sample anymore.
+########################################################
+# 13. Results (Differential expression)
+########################################################
+
+resultsNames(dds) #---> to show the title of (coef) for the lfcShrink() later.
+
+dds$tissue <- relevel(dds$tissue, ref = "Spinal_cord_brain")
+
+
+# The paper says: Differentially expressed genes in SC/B compared to BM, SP and LN
+# log2FoldChange = SC/B - Spleen  ---> (log2FC > 0) --> higher in SC/B
+#                                 ---> (log2FC < 0) --> lower in SC/B --> OR higher in Spleen
+# What makes spinal cord/Brain leukemia cells special?
+
+
+dds <- DESeq(dds) #Re-run DESeq (ONLY if you changed reference)
+
+# Spleen:
+#--------
+
+res_spleen <- results(dds, contrast = c("tissue",
+                                        "Spinal_cord_brain",
+                                        "Spleen"))
+
+
+res_spleen_shrunk <- lfcShrink( dds, coef = "tissue_Spleen_vs_Spinal_cord_brain",
+                                     type = "apeglm")
+
+res_spleen_shrunk$log2FoldChange <- -res_spleen_shrunk$log2FoldChange   #-->((*NOTE* LOOK IN NOTES BELOW.))
+
+
+
+# lymph node:
+#------------
+
+res_ln <- results(dds, contrast = c("tissue",   
+                                    "Spinal_cord_brain", 
+                                    "Lymph_nodes"))
+
+
+res_ln_shrunk <- lfcShrink(dds, coef = "tissue_Lymph_nodes_vs_Spinal_cord_brain",
+                                type = "apeglm")
+
+res_ln_shrunk$log2FoldChange <- -res_ln_shrunk$log2FoldChange
+
+
+# Bone marrow:
+#-------------
+
+res_bm <- results(dds, contrast = c("tissue", 
+                                    "Spinal_cord_brain", 
+                                    "Bone_marrow"))
+
+
+res_bm_shrunk <- lfcShrink( dds, coef = "tissue_Bone_marrow_vs_Spinal_cord_brain",
+                                 type = "apeglm")
+
+res_bm_shrunk$log2FoldChange <- -res_bm_shrunk$log2FoldChange
+
+
+# Total = Spleen + LN + BM (vs) SC/B:
+#-------------------------------------
+
+res_spleen_shrunk$comparison <- "SC/B vs Sp" #----> create a new column called (comparison)
+res_ln_shrunk$comparison <- "SC/B vs LN"
+res_bm_shrunk$comparison <- "SC/B vs BM"
+
+
+df <- rbind( as.data.frame(res_spleen_shrunk),
+             as.data.frame(res_ln_shrunk),
+             as.data.frame(res_bm_shrunk))
+
+df$GENEID <- rownames(df)
+
+df$status <- "Not significant"        #----> create a new column called (status)
+df$status[df$log2FoldChange > 0 & df$padj < 0.05] <- "Up" #--> Higher in SC/B
+df$status[df$log2FoldChange < 0 & df$padj < 0.05] <- "Down" #--> Lower in SC/B & Higher in SP/LN/BM
+
+df$status <- factor(df$status, levels = c("Up",
+                                          "Not significant",
+                                          "Down")) # This to make the order of the legend (UP) first.
+
+
+
+```
+
+
+
+
+```{r}
+
+########################################################
+# 14. SECOND Visualization: Gene by Gene
+########################################################
+
+pdf( file.path(fig.dir, "MA_Plot.pdf"), width = 14, height = 6)
+
+# A. MA plot
+#############
+
+MAplot <- ggplot(df, aes(x = baseMean, 
+                         y = log2FoldChange, 
+                     color = status))+
+          geom_point(size = 0.8, alpha = 0.7) +
+          scale_x_log10() +
+          geom_hline(yintercept = 0, linetype = "dashed") +
+          scale_color_manual(values = c( "Up" = "red", "Down" = "blue", "Not significant" = "grey70"))+
+          facet_wrap(~comparison) +
+          theme_bw(base_size = 12) +
+          labs( title = "MA plot: Expression changes in SC/B vs SP, LN, and BM",
+                    x = "Mean expression (log scale)",
+                    y = "Log2 fold change")
+
+
+MAplot
+
+dev.off()
+
+
+
+# B. Volacno plot
+#################
+
+pdf( file.path(fig.dir, "Volcano_Plot.pdf"), width = 14, height = 6)
+
+
+Volcanoplot <- ggplot(df, aes(x = log2FoldChange,
+                              y = -log10(padj),
+                              color = status)) +
+
+               geom_point(size = 0.8, alpha = 0.7) +
+
+               scale_color_manual(values = c("Up" = "red",
+                                             "Down" = "blue",
+                                             "Not significant" = "grey70")) +
+
+               geom_vline(xintercept = c(-1, 1), linetype = "dashed") +
+               geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
+
+               facet_wrap(~comparison) +
+
+               theme_bw(base_size = 12) +
+               labs(title = "Gene expression changes in SC/B vs SP, LN, BM",
+               x = "Log2 Fold Change",
+               y = "-log10(adjusted p-value)")
+
+
+Volcanoplot
+
+dev.off()
+
+
+
+```
+
+
+
+
+```{r}
+
+# C. Heatmap
+############
+# First we need to make annotation to be able to show the name of the genes on heat map instead of ENSMUSG00000000001
+######################################################################################################################
+
+
+########################################################
+# 15. ANNOTATION: before heatmap
+########################################################
+
+
+# Annotation table:
+#-------------------
+
+columns(org.Mm.eg.db)
+
+annotation <- data.frame( GENEID = rownames(res_spleen_shrunk),
+                          
+                          SYMBOL = mapIds( org.Mm.eg.db,
+                          keys = rownames(res_spleen_shrunk),
+                          column = "SYMBOL",
+                          keytype = "ENSEMBL",
+                          multiVals = "first"),
+
+                          ENTREZID = mapIds( org.Mm.eg.db,
+                          keys = rownames(res_spleen_shrunk),
+                          column = "ENTREZID",
+                          keytype = "ENSEMBL",
+                          multiVals = "first"),
+
+                          GENENAME = mapIds( org.Mm.eg.db,
+                          keys = rownames(res_spleen_shrunk),
+                          column = "GENENAME",
+                          keytype = "ENSEMBL",
+                          multiVals = "first"),
+
+                          stringsAsFactors = FALSE)
+
+
+
+
+# Differential expression table:
+#-------------------------------
+
+res_spleen_de <- data.frame( GENEID = rownames(res_spleen_shrunk),  res_spleen_shrunk)
+
+res_ln_de <- data.frame( GENEID = rownames(res_ln_shrunk), res_ln_shrunk)
+
+res_bm_de <- data.frame( GENEID = rownames(res_bm_shrunk), res_bm_shrunk)
+
+
+# C. Heatmap
+############
+
+# Prep the data for heatmap:
+#---------------------------
+
+vsd <- vst(dds, blind = FALSE) # Do not remove the huge variability between the samples
+
+mat <- assay(vsd)
+
+colnames(mat) <- c( "SP-1","SP-2","SP-3",
+                    "LN-1","LN-2","LN-3",
+                    "SC/B-1","SC/B-2","SC/B-3",
+                    "BM-1","BM-2","BM-3")
+
+
+
+# 1 # Heatmap for UP-reg:
+#------------------------
+# for the TOP 50 UP-regulated genes: to compare between(Spleen vs SC/B), LN, BM
+# NOT between: SP, LN, BM, SC/B
+# To show: whether LN/BM behave more like Spleen or like SC/B
+#################################################################################
+
+# select top genes (UP and DOWN):
+
+res_spleen_de$padj <- res_spleen_shrunk$padj
+
+
+
+# TOP 50 UP-regulated genes:
+
+up_genes <- res_spleen_de[ res_spleen_de$padj < 0.05 &
+                           res_spleen_de$log2FoldChange > 0 &
+                           !is.na(annotation$SYMBOL[match(res_spleen_de$GENEID, annotation$GENEID)]) &
+                           annotation$SYMBOL[match(res_spleen_de$GENEID, annotation$GENEID)] != "",]
+
+
+up_genes <- up_genes[order(-up_genes$log2FoldChange), ]
+
+up_genes <- head(up_genes, 50)
+
+up_ids <- up_genes$GENEID
+
+
+up_ids <- up_ids[up_ids %in% rownames(mat)]
+
+mat_up <- mat[up_ids, , drop = FALSE]
+
+gene_names <- annotation$SYMBOL[match(up_ids, annotation$GENEID)]
+
+gene_names <- ifelse(is.na(gene_names) | gene_names == "", up_ids, gene_names)
+
+rownames(mat_up) <- gene_names
+
+
+
+pdf( file.path(fig.dir, "TOP UP-reg Heatmap.pdf"), width = 14, height = 8)
+
+pheatmap( mat_up, scale = "row",
+                  cluster_rows = TRUE,
+                  cluster_cols = FALSE,
+                  show_colnames = TRUE,
+                  fontsize_row = 8,
+                  main = "Top 50 UP-regulated genes in SC/B relative to SP, LN and BM")
+
+dev.off()
+
+
+
+# 2 # Heatmap for DOWN-reg:
+#--------------------------
+# for the TOP 50 DOWN-regulated genes: to compare between(Spleen vs SC/B), LN, BM
+# NOT between: SP, LN, BM, SC/B
+# To show: whether LN/BM behave more like Spleen or like SC/B
+#################################################################################
+
+
+down_genes <- res_spleen_de[ res_spleen_de$padj < 0.05 &
+                             res_spleen_de$log2FoldChange < 0 &
+                             !is.na(annotation$SYMBOL[match(res_spleen_de$GENEID, annotation$GENEID)]) &
+                             annotation$SYMBOL[match(res_spleen_de$GENEID, annotation$GENEID)] != "",]
+
+
+down_genes <- down_genes[order(down_genes$log2FoldChange), ]
+
+down_genes <- head(down_genes, 50)
+
+down_ids <- down_genes$GENEID
+
+
+down_ids <- down_ids[down_ids %in% rownames(mat)]
+
+mat_down <- mat[down_ids, , drop = FALSE]
+
+
+gene_names <- annotation$SYMBOL[match(down_ids, annotation$GENEID)]
+
+gene_names <- ifelse(is.na(gene_names) | gene_names == "", down_ids, gene_names)
+
+rownames(mat_down) <- gene_names
+
+
+
+pdf( file.path(fig.dir, "TOP DOWN-reg Heatmap.pdf"), width = 14, height = 8)
+
+pheatmap( mat_down, scale = "row",
+                    cluster_rows = TRUE,
+                    cluster_cols = FALSE,
+                    show_colnames = TRUE,
+                    fontsize_row = 8,
+                    main = "Top 50 Down-regulated genes in SC/B relative to SP, LN and BM")
+
+dev.off()
+
+
+
+
+############################################################
+# Heat map for the top 50 genes in SC/B, SP, LN, BM equally
+############################################################
+
+# Prep the data:
+#---------------
+
+dds <- DESeq(dds)
+
+dds_lrt <- DESeq(dds, test = "LRT", reduced = ~1)
+
+res_lrt <- results(dds_lrt)
+
+res_all_de <- data.frame( GENEID = rownames(res_lrt), res_lrt)
+
+
+
+# Annotation of Significant genes:
+#---------------------------------
+
+sig_genes <- res_all_de[ res_all_de$padj < 0.05 &
+                         !is.na(annotation$SYMBOL[ match(res_all_de$GENEID, annotation$GENEID)]) &
+                         annotation$SYMBOL[ match(res_all_de$GENEID, annotation$GENEID)] != "",]
+
+
+
+sig_genes <- sig_genes[order(sig_genes$padj), ]
+
+sig_genes <- head(sig_genes, 50)
+
+sig_ids <- sig_genes$GENEID
+
+sig_ids <- sig_ids[sig_ids %in% rownames(mat)]
+
+mat_sig <- mat[sig_ids, , drop = FALSE]
+
+gene_names <- annotation$SYMBOL[ match(sig_ids, annotation$GENEID)]
+
+
+gene_names <- ifelse(is.na(gene_names) | gene_names == "", sig_ids, gene_names)
+
+rownames(mat_sig) <- gene_names
+
+
+# 3 # Heat map:
+#--------------
+# for the TOP 50 significant genes: based on padj values in SC/B, SP, LN, BM
+############################################################################
+
+pdf(file.path(fig.dir, "TOP Sig genes Heatmap.pdf"),
+              width = 14,
+              height = 8)
+
+
+pheatmap( mat_sig, scale = "row",
+                   cluster_rows = TRUE,
+                   cluster_cols = TRUE,
+                   show_colnames = TRUE,
+                   fontsize_row = 8,
+                   main = "Top 50 significant genes across SC/B, SP, LN and BM")
+
+
+dev.off()
+
+
+```
+
+
+
+
+```{r}
+
+# D. Bar graph: To compare the relative expression of selected genes across different tissues.
+##############
+
+norm_counts <- counts(dds, normalized = TRUE)
+
+mean_exp <- data.frame( SP  = rowMeans(norm_counts[,1:3]),
+                        LN  = rowMeans(norm_counts[,4:6]),
+                        SCB = rowMeans(norm_counts[,7:9]),
+                        BM  = rowMeans(norm_counts[,10:12]))
+
+rownames(mean_exp) <- rownames(norm_counts)
+
+
+relative_exp <- mean_exp
+
+relative_exp$LN  <- relative_exp$LN  / relative_exp$SP
+relative_exp$SCB <- relative_exp$SCB / relative_exp$SP
+relative_exp$BM  <- relative_exp$BM  / relative_exp$SP
+relative_exp$SP  <- 1
+
+
+genes <- c("Pim1","Sky", "Pax5", "Cd79a", "Cd79b", "Lck", "Zap70", "Map2k3", "Junb", "Foxo1", "Socs3", "Mcl1")
+
+symbols <- mapIds(org.Mm.eg.db,
+                  keys = rownames(relative_exp),
+                  column = "SYMBOL",
+                  keytype = "ENSEMBL",
+                  multiVals = "first")
+
+relative_exp$SYMBOL <- symbols
+
+plot_df <- relative_exp[relative_exp$SYMBOL %in% genes, ]
+
+plot_df <- plot_df[ ,c("SYMBOL","SP","LN","BM","SCB")]
+
+plot_df <- pivot_longer(plot_df, cols = c(SP,LN,BM,SCB),
+                                 names_to = "Tissue",
+                                 values_to = "RelativeExpression")
+
+
+
+pdf(file.path(fig.dir, "Bar graph.pdf"), width = 8, height = 6)
+
+ggplot(plot_df, aes(x = SYMBOL,
+                    y = RelativeExpression,
+                    fill = Tissue)) +
+
+       geom_bar(stat = "identity",
+       position = position_dodge(),
+       color = "black") +
+  
+       scale_y_continuous(limits = c(0, 10), expand = c(0, 0)) +   # removes space at bottom
+       scale_x_discrete(expand = c(0, 0)) +     # removes space at sides
+       scale_fill_manual(values = c( "SP"  = "darkgreen",
+                                     "LN"  = "red",
+                                     "BM"  = "blue",
+                                     "SCB" = "orange")) +
+        
+        theme_classic(base_size = 12) +
+  
+        theme( axis.line = element_line(color = "black"), # x/y axis line 
+               axis.ticks = element_line(color = "black"),
+               panel.border = element_blank(),     # remove plot border
+               panel.grid = element_blank(),       # remove grid lines
+               legend.title = element_text(face = "bold"),
+               plot.title = element_text(hjust = 0.5)) +  # center title
+       
+       labs(x = "Gene",
+            y = "Relative expression (SP = 1)",
+            title = "Gene expression relative to spleen")
+
+
+dev.off()
+
+
+```
+
+
+
+```{r}
+
+#1# We started with sample vs sample analysis.
+
+#2# Then, genes analysis
+
+#3# Now, we should group every related genes into groups pathway to understand the bigger picture using: KEGG Pathway enrichment.
+
+
+########################################################
+# 16. KEGG Pathway Enrichment:
+########################################################
+
+
+# 1 # KEGG for UP-regulated genes in SC/B
+#-----------------------------------------
+
+
+#SP
+
+gene_list_spleen <- res_spleen_shrunk$log2FoldChange
+
+names(gene_list_spleen) <- mapIds(org.Mm.eg.db,
+                                  keys = rownames(res_spleen_shrunk),
+                                  column = "ENTREZID",
+                                  keytype = "ENSEMBL",
+                                  multiVals = "first")
+
+gene_list_spleen <- sort(gene_list_spleen, decreasing = TRUE)
+
+gene_list_spleen <- na.omit(gene_list_spleen) # removes all genes whose value or name is NA
+
+kegg_spleen <- gseKEGG(geneList = gene_list_spleen,
+                       organism = "mmu")
+
+df_spleen <- as.data.frame(kegg_spleen)[1:50, ]
+
+df_spleen$comparison <- "SC/B vs SP"
+
+df_spleen$direction <- ifelse(df_spleen$NES > 0, "Up", "Down")
+
+
+# LN
+
+gene_list_ln <- res_ln_shrunk$log2FoldChange
+
+names(gene_list_ln) <- mapIds(org.Mm.eg.db,
+                              keys = rownames(res_ln_shrunk),
+                              column = "ENTREZID",
+                              keytype = "ENSEMBL",
+                              multiVals = "first")
+
+gene_list_ln <- sort(gene_list_ln, decreasing = TRUE)
+
+gene_list_ln <- na.omit(gene_list_ln)
+
+kegg_ln <- gseKEGG(geneList = gene_list_ln,
+                   organism = "mmu")
+
+df_ln <- as.data.frame(kegg_ln)[1:50, ]
+
+df_ln$comparison <- "SC/B vs LN"
+
+df_ln$direction <- ifelse(df_ln$NES > 0, "Up", "Down")
+
+
+# BM
+
+gene_list_bm <- res_bm_shrunk$log2FoldChange
+
+names(gene_list_bm) <- mapIds(org.Mm.eg.db,
+                              keys = rownames(res_bm_shrunk),
+                              column = "ENTREZID",
+                              keytype = "ENSEMBL",
+                              multiVals = "first")
+
+gene_list_bm <- sort(gene_list_bm, decreasing = TRUE)
+
+gene_list_bm <- na.omit(gene_list_bm)
+
+kegg_bm <- gseKEGG(geneList = gene_list_bm,
+                   organism = "mmu")
+
+df_bm <- as.data.frame(kegg_bm)[1:50, ]
+
+df_bm$comparison <- "SC/B vs BM"
+
+df_bm$direction <- ifelse(df_bm$NES > 0, "Up", "Down")
+
+
+
+
+# ALL
+
+
+all_kegg <- rbind(df_spleen, df_ln, df_bm)
+
+all_kegg$logFDR <- -log10(all_kegg$p.adjust)
+
+
+
+# UP
+
+up_plot <- subset(all_kegg, direction == "Up")
+
+up_levels <- unique( up_plot$Description[ order( up_plot$comparison != "SC/B vs SP",
+                                                -up_plot$logFDR)])
+
+up_plot$Description <- factor( up_plot$Description, levels = rev(up_levels))
+
+
+
+pdf(file.path(fig.dir, "KEGG_UP.pdf"), width = 8, height = 12)
+
+ggplot(up_plot, aes(x = comparison,
+                    y = Description)) +
+
+       geom_point(aes(size = setSize,
+                     color = logFDR)) +
+
+       scale_color_gradient(low = "blue",
+                           high = "red") +
+
+      theme_bw(base_size = 12) +
+
+      theme( axis.text.x = element_text(angle = 45, hjust = 1)) +
+
+      labs( x = NULL,
+            y = "KEGG pathway",
+        title = "Up-regulated pathways in SC/B")
+
+
+dev.off()
+
+
+
+# Down
+
+down_plot <- subset(all_kegg, direction == "Down")
+
+down_levels <- unique( down_plot$Description[ order( down_plot$comparison != "SC/B vs SP",
+                                                    -down_plot$logFDR)])
+
+down_plot$Description <- factor( down_plot$Description, levels = rev(down_levels))
+
+
+
+pdf(file.path(fig.dir, "KEGG_DOWN.pdf"), width = 8, height = 12)
+
+ggplot(down_plot, aes(x = comparison,
+                      y = Description)) +
+
+       geom_point(aes(size = setSize,
+                     color = logFDR)) +
+
+       scale_color_gradient(low = "blue",
+                           high = "red") +
+
+       theme_bw(base_size = 12) +
+
+       theme( axis.text.x = element_text(angle = 45,
+                                         hjust = 1)) +
+
+       labs( x = NULL,
+             y = "KEGG pathway",
+         title = "Down-regulated pathways in SC/B")
+
+
+dev.off()
+
+
+
+```
+
+
+
+
