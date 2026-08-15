@@ -1,0 +1,2 @@
+Conclusion
+This project analyzed the bulk RNA-seq data from GSE233937 using R and Bioconductor. SC/B samples showed a different gene expression profile from BM, LN, and SP samples. SC/B had higher expression of genes related to cell survival, stress responses, ECM-receptor interaction, and TGF-β signaling, while genes related to ribosomes and oxidative phosphorylation had lower expression. These results are consistent with the study and show that tissue location is associated with changes in leukemic cell gene expression.
