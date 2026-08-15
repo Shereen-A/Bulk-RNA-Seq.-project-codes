@@ -1,1 +1,6 @@
+Sample Heatmap
+Hierarchical clustering grouped all SC/B samples together while BM, SP, and LN clustered separately.
+
+Biological Interpretation:
+The clustering confirms the PCA results and indicates biological reproducibility between replicates. The SC/B samples cluster together and have a different expression pattern from the BM, SP, and LN samples.
 
