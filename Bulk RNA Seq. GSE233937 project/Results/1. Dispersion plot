@@ -1,1 +1,2 @@
-
+Dispersion Plot:
+The dispersion plot demonstrates the relationship between gene expression and biological variability across samples. Most genes closely followed the fitted dispersion trend, indicating that the estimated dispersion model appropriately captured the variance in the dataset. This suggests that the data were suitable for reliable differential expression analysis using DESeq2. 
