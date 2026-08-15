@@ -1,1 +1,17 @@
+KEGG Pathway Enrichment Analysis:
+
+Upregulated pathways
+The most significantly enriched pathways included:
+•	ECM-receptor interaction 
+•	TGF-β signaling 
+Biological Interpretation:
+ECM-receptor interaction indicates increased communication between leukemic cells and the extracellular matrix of the CNS. Stronger interactions with the surrounding microenvironment may facilitate leukemic cell survival, migration, and retention within the spinal cord and brain.
+TGF-β signaling is involved in regulating cell growth, differentiation, immune responses, and survival. The study identified increased TGF-β signaling in CNS-infiltrating leukemic cells, suggesting that this pathway contributes to the specialized transcriptional program adopted within the CNS and may promote persistence under chemotherapy pressure. 
+
+Downregulated pathways:
+The most significantly enriched downregulated pathways included:
+•	Ribosome 
+•	Oxidative phosphorylation 
+Biological Interpretation:
+Reduced expression of ribosomal genes suggests decreased protein synthesis, while downregulation of oxidative phosphorylation indicates altered mitochondrial energy metabolism. Together, these findings suggest that CNS leukemic cells adopt a metabolically distinct state compared with leukemic cells in peripheral tissues. Such metabolic reprogramming may represent an adaptive strategy that supports survival within the CNS microenvironment. 
 
