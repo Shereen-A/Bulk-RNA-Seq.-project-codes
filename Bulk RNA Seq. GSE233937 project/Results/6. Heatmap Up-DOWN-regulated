@@ -1,1 +1,11 @@
+Heatmap of Upregulated Genes:
+The most highly upregulated genes in SC/B showed relatively low expression in BM, SP, and LN.
 
+Biological Interpretation
+These genes are highly expressed in SC/B and have lower expression in BM, LN, and SP. They include genes involved in cell signaling, stress responses, and cell survival, indicating that leukemic cells in SC/B have a different gene expression pattern from the other tissues.
+
+Heatmap of Downregulated Genes:
+Genes that were downregulated in SC/B remained highly expressed in peripheral tissues.
+
+Biological Interpretation
+These genes have lower expression in SC/B and higher expression in BM, LN, and SP. Many of them are involved in protein synthesis and oxidative phosphorylation. This shows that these processes have lower activity in SC/B compared with the other tissues.
