@@ -1,1 +1,32 @@
+Project Overview:
+This project reproduces the bulk RNA-seq analysis from the published study "Dynamic evolution of TCF3-PBX1 leukemias at the single-cell level under chemotherapy pressure." The analysis was performed using the publicly available GSE233937 dataset and focuses on the transcriptomic differences between leukemic cells isolated from the spinal cord/brain (SC/B), bone marrow (BM), spleen (SP), and lymph nodes (LN) in a mouse model of TCF3-PBX1 acute lymphoblastic leukemia.
+
+Biological Background:
+TCF3-PBX1 is a recurrent chromosomal translocation found in B-cell precursor acute lymphoblastic leukemia. Although many patients initially respond to chemotherapy, relapse frequently involves infiltration of leukemic cells into the central nervous system (CNS), where the surrounding microenvironment can promote leukemia cell survival and therapy resistance. The study investigated how leukemic cells adapt to different tissue environments and identified transcriptional programs associated with CNS infiltration and chemotherapy resistance.
+
+Dataset:
+   •	Dataset: GSE233937 
+   •	Species: Mus musculus 
+   •	Disease: TCF3-PBX1 acute lymphoblastic leukemia 
+   •	Samples: 12 bulk RNA-seq samples 
+             o	Bone marrow (BM): 3 
+             o	Spleen (SP): 3 
+             o	Lymph nodes (LN): 3 
+             o	Spinal cord/Brain (SC/B): 3
+
+Analysis Workflow:
+Starting from transcript quantification generated after quality control, trimming, and Salmon quantification, the RNA-seq analysis was performed entirely in R using Bioconductor packages.
+
+The workflow included:
+•	Importing transcript abundance with tximport 
+•	Gene-level differential expression analysis using DESeq2 
+•	Normalization of sequencing counts 
+•	Dispersion estimation 
+•	Principal Component Analysis (PCA) 
+•	Sample clustering heatmap 
+•	MA plots 
+•	Volcano plots 
+•	Heatmaps of differentially expressed genes 
+•	Relative expression analysis of selected genes 
+•	KEGG pathway enrichment analysis 
 
